@@ -1,3 +1,210 @@
+--!strict
+
+--credit to @gelatekforever, @c_s911
+
+local settings = {
+       SimulationRadius = true,
+       AntiSleepStrength = 0.0099,
+
+       Tools = {
+              ["Left Arm"] = {offset = CFrame.Angles(0,0, math.rad(90)) * CFrame.new(0,0,0)},
+
+              ["Right Arm"] = {offset = CFrame.Angles(0,0, math.rad(90)) * CFrame.new(0,0,0)},
+
+              ["Left Leg"] = {offset = CFrame.Angles(0,0, math.rad(90)) * CFrame.new(0,0,0)},
+
+              ["Right Leg"] = {offset = CFrame.Angles(0,0, math.rad(90)) * CFrame.new(0,0,0)},
+
+              ["Torso"] = {offset = CFrame.Angles(0,0, math.rad(90)) * CFrame.new(0,0,0)},
+
+              ["Head"] = {offset = CFrame.Angles(0,45, math.rad(90)) * CFrame.new(0,0,0)}
+       }
+
+
+}
+
+local ConfigurationTool = settings.Tools
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local PostSimulation = RunService.PostSimulation
+local RenderStepped = RunService.RenderStepped
+local tableinsert = table.insert
+local Instancenew = Instance.new
+local Vector3new = Vector3.new
+local CFrameNew = CFrame.new
+local osclock = os.clock
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character
+local Humanoid = Character.Humanoid
+local RootPart = Character.HumanoidRootPart
+local RootPos = RootPart.CFrame
+local Camera = workspace.CurrentCamera
+local Backpack = LocalPlayer.Backpack
+local FakeRig = Players:CreateHumanoidModelFromDescription(Instancenew("HumanoidDescription"),Enum.HumanoidRigType.R6)
+local FakeHumanoidRootPart = FakeRig.HumanoidRootPart
+local FakeHumanoid = FakeRig.Humanoid
+
+FakeRig.Parent = workspace
+FakeRig:PivotTo(RootPos)
+Camera.CameraSubject = FakeRig
+RootPart.Anchored = true
+RootPart.AssemblyLinearVelocity = Vector3new(0,1,0)
+
+for _, rig in ipairs(FakeRig:GetDescendants()) do
+       if rig:IsA("BasePart") then
+              rig.Transparency = 1
+              rig.CanQuery = false
+              rig.CanCollide = false
+              elseif rig:IsA("Decal") then
+                     rig.Transparency = 1
+       end
+end
+
+local function FindTools( from : Instance )
+       local Tools : {Tool} = {}
+
+       for _, children in pairs(from:GetChildren()) do
+              if children:IsA("Tool") then
+                     tableinsert(Tools,children)
+              end
+       end
+
+       return Tools
+end
+
+local function SetTotalToolProperty()
+       for _, property in pairs(FindTools(Backpack)) do
+              if property:FindFirstChild("Handle") then
+                     local Handle = property:FindFirstChild("Handle")
+
+                     if Handle and Handle:FindFirstChild("BasePart") then
+                            Handle.Massless = true
+                            Handle.CanQuery = false
+                            Handle.CanCollide = false
+                            Handle.CanTouch = false
+                     end
+              end
+       end
+end
+
+local function SetToolsTo( from : Instance, to : Path )
+       for _, equip in pairs(FindTools(from)) do
+              equip.Parent = to
+       end
+end
+
+local function equipTools()
+       for _, tool in pairs(FindTools(Backpack)) do
+              tool.Parent = Character
+       end
+end
+
+local function PreEquip()
+       if Character:FindFirstChild("Tool") then
+              SetToolsTo(Character,Backpack)
+
+              else
+                     SetToolsTo(Backpack,Character)
+                     SetToolsTo(Character,Backpack)
+       end
+end
+
+local function DropTools()
+       if Character:FindFirstChild("Torso") then
+              local Torso = Character:FindFirstChild("Torso")
+              local RightShoulder = Torso:FindFirstChild("Right Shoulder")
+
+              PreEquip()
+
+              if RightShoulder then
+                     RightShoulder:Destroy()
+              end
+              task.wait(4)
+              PreEquip()
+              equipTools()
+
+              elseif Character:FindFirstChild("RightHand") then
+                     local RightHand = Character.RightHand
+
+                     PreEquip()
+
+                     if RightHand then
+                            RightHand:Destroy()
+                     end
+
+                     task.wait(4)
+                     PreEquip()
+                     equipTools()
+       end
+end
+
+
+local function Align( Part0 : BasePart, Part1 : BasePart, Part0Angle : CFrame?)
+       Part0.AssemblyLinearVelocity = Vector3new(0,5,0)
+       local Angle = Part0Angle or CFrameNew()
+       Part0.CFrame = Part1.CFrame * Angle + Vector3new(0,0,math.sin(osclock()*28)*settings.AntiSleepStrength)
+end
+
+local function SetSimulationRadius()
+       sethiddenproperty(LocalPlayer, "SimulationRadius", 1000)
+end
+
+local function LetsGetThePartyStarted()
+
+       PreEquip()
+       
+       local Tool : {Tool} = {}
+
+       for _, Tools in pairs(FindTools(Backpack)) do
+              if Tools:IsA("Tool") then
+                     local Handle = Tools:FindFirstChild("Handle")
+
+                     if Handle and Handle:IsA("BasePart") then
+                            tableinsert(Tool,Handle)
+                     end
+              end
+              
+       end
+
+       SetTotalToolProperty()
+       DropTools()
+
+       if settings.SimulationRadius == true then
+              SetSimulationRadius()
+       end
+
+       if RootPart.Anchored then
+              RootPart.Anchored = false
+       end
+
+       PostSimulation:Connect(function()
+              local ToolCount = 1
+
+              for bodypart, config in pairs(ConfigurationTool) do
+                     if Tool[ToolCount] then
+                            local offset = config.offset or CFrameNew()
+
+                            RootPart.CFrame = FakeHumanoidRootPart.CFrame * CFrameNew(0,-8,0)
+
+                            Align(Tool[ToolCount],FakeRig[bodypart],offset)
+
+                            ToolCount = ToolCount + 1
+                     end
+              end
+       end)
+
+       RenderStepped:Connect(function()
+              FakeHumanoid:Move(Humanoid.MoveDirection)
+              FakeHumanoid.Jump = Humanoid.Jump
+       end)
+end
+LetsGetThePartyStarted()
+
+Player=game.Players.LocalPlayer
+Character=FakeRig
+hum = Character.Humanoid
+
 -- Krystal Dance V3, Made by Hemi (es muy janky)
 if not isfolder("Dances") then 
     makefolder("Dances")
